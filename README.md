@@ -3,7 +3,7 @@
 ADNI (Alzheimer's Disease Neuroimaging Initiative) GO/1/2/3/4 전체 코호트의
 임상 데이터 추출 및 DICOM 영상 매칭 파이프라인.
 
-LONI에서 제공하는 ADNIMERGE2 R 패키지의 .rda 데이터를 Python으로 추출하고,
+LONI에서 제공하는 ADNIMERGE2 R 패키지의 `.rda` 데이터를 Python으로 추출하고,
 NFS 서버의 DICOM 파일과 매칭하여 통합 CSV(`MERGED.csv`)를 생성한다.
 
 ---
@@ -17,8 +17,27 @@ ADNI_match/
 ├── adni_matching/       # Part 2: DICOM 매칭 파이프라인
 │   └── orig/            #   레퍼런스 코드 (XML 기반, 수정 금지)
 ├── scripts/             # 검증 및 유틸리티 스크립트
-├── docs/                # 검증 리포트
 └── ini/                 # 설정 예시
+```
+
+---
+
+## 데이터 흐름
+
+```
+ADNIMERGE2/data/*.rda (217개)
+    │
+    ▼  adnimerge_py (rda_converter)
+csv/tables/*.csv (217개 1:1 변환, MRIQC.csv·APOERES.csv 포함)
+    │
+    ▼  adnimerge_py (build_adnimerge)
+ADNIMERGE_{DATE}.csv (23,479행 × 132열)
+    │
+    ▼  adni_matching
+DCM 인벤토리 + ADNIMERGE 매칭
+    │
+    ▼
+{MOD}_all.csv → {MOD}_unique.csv → MERGED.csv (13,042행 × 782열)
 ```
 
 ---
@@ -68,12 +87,11 @@ ADNIMERGE2 R 패키지의 빌드 로직을 Python/pandas로 1:1 이식한 패키
 ### 실행
 
 ```bash
-# 전체 실행 (rda 변환 + ADNIMERGE + MRIQC + APOERES)
+# 전체 실행 (rda 변환 + ADNIMERGE 빌드)
 python -m adnimerge_py
 
 # 개별 단계
 python -m adnimerge_py --build-adnimerge
-python -m adnimerge_py --build-mriqc
 python -m adnimerge_py --convert-all
 
 # 옵션
@@ -85,9 +103,7 @@ python -m adnimerge_py --rda-dir /path/to/ADNIMERGE2/data --output-dir /path/to/
 | 파일 | 설명 |
 |------|------|
 | `ADNIMERGE_{DATE}.csv` | 23,479행 × 132열, 4,498 피험자 |
-| `MRIQC_{DATE}.csv` | 90,250행 MRI QC 메타데이터 |
-| `APOERES_{DATE}.csv` | 3,008행 APOE 유전형 |
-| `tables/*.csv` | 217개 .rda 1:1 CSV 변환 |
+| `tables/*.csv` | 217개 .rda 1:1 CSV 변환 (MRIQC.csv, APOERES.csv 등 포함) |
 
 상세 설명: [`adnimerge_py/README.md`](adnimerge_py/README.md)
 
@@ -118,9 +134,9 @@ DICOM 영상을 임상 데이터와 매칭하는 v4 파이프라인.
 5. MRIQC에서 프로토콜 정보, DCM에서 TE/TR/TI 추출
 6. `_all.csv` (전체) → `_unique.csv` (PTID×VISCODE 중복 제거) → `MERGED.csv`
 
-### 지원 모달리티 (12개 + 미실행)
+### 지원 모달리티
 
-**매칭 완료**: T1, AV45_8MM/6MM, AV1451_8MM/6MM, FBB_6MM, FLAIR, T2_FSE/TSE/STAR, T2_3D, MK6240_6MM
+**매칭 완료 (12개)**: T1, AV45_8MM/6MM, AV1451_8MM/6MM, FBB_6MM, FLAIR, T2_FSE/TSE/STAR, T2_3D, MK6240_6MM
 
 **미실행**: DTI, DTI_MB, FMRI, HIPPO, ASL, NAV4694_6MM, PI2620_6MM
 
@@ -166,45 +182,128 @@ python -m adni_matching.run_pipeline --merge-only --output /path/to/output
 
 ---
 
-## 5. Validation (이전 매칭과의 비교)
+## 5. Validation
 
-v4 파이프라인 결과를 기존 XML 기반 매칭 결과(ref)와 비교 검증하였다.
-상세 리포트는 `docs/` 디렉토리 참조.
+v4 파이프라인(XML 제거, Python 이식) 결과를 기존 XML 기반 매칭 결과(ref)와 비교 검증하였다.
 
-### ADNI1/GO/2/3 (ref 대비)
+### 5.1. ADNI1/GO/2/3 매칭 검증
 
-| 항목 | 결과 |
+| Metric | Ref | New |
+|--------|-----|-----|
+| 행 수 | 11,710 | 11,744 |
+| 피험자 | 2,631 | 2,632 |
+| 공통 행 (PTID+VISCODE) | 11,692 | (ref 커버리지 99.8%) |
+
+**모달리티별 ImageUID 일치율 (공통 행 기준)**
+
+| 모달리티 | 비교 건수 | 일치 | 일치율 |
+|----------|-----------|------|--------|
+| T1 | 11,021 | 11,018 | **100.0%** |
+| AV45_8MM | 3,154 | 3,154 | **100.0%** |
+| AV45_6MM | 2,860 | 2,860 | **100.0%** |
+| AV1451_8MM | 1,570 | 1,570 | **100.0%** |
+| AV1451_6MM | 1,532 | 1,532 | **100.0%** |
+| FBB_6MM | 586 | 586 | **100.0%** |
+| FLAIR | 3,359 | 3,358 | **100.0%** |
+| T2_FSE | 2,094 | 2,084 | 99.5% |
+| T2_TSE | 1,705 | 1,703 | 99.9% |
+| T2_STAR | 6,576 | 6,571 | 99.9% |
+
+촬영일(AQUDATE)은 전 모달리티 **100.0%** 일치.
+
+### 5.2. ADNI4 매칭 검증
+
+VISCODE 체계가 다르므로 (ref: `4_sc/4_init/4_m12`, new: `m000/m003/m012`) PTID+AQUDATE 기준으로 비교.
+
+| 모달리티 | 공통 건수 | 일치율 | 비고 |
+|----------|-----------|--------|------|
+| AV45_6MM | 398 | **100.0%** | — |
+| AV1451_6MM | 549 | **100.0%** | — |
+| FBB_6MM | 305 | 99.7% | — |
+| MK6240_6MM | 108 | **100.0%** | — |
+| T2_3D | 891 | **100.0%** | — |
+| FLAIR | 949 | 96.9% | VISCODE 차이 영향 |
+| T1 | 944 | 89.2% | VISCODE 차이 + 다중 시리즈 선택 |
+| T2_STAR | 824 | 26.6% | 세션당 최대 10 시리즈, VISCODE 차이 증폭 |
+
+**Ref-only PTID 229명 원인**: 224명은 NFS에 DCM 파일 자체가 없음 (ref는 XML 메타데이터 기반이라 물리적 파일 없이도 행 생성 가능). 파이프라인 버그가 아닌 **데이터 가용성 차이**.
+
+### 5.3. ADNI4 VISCODE Error 분석
+
+ADNI3/4에서 MRI 촬영일과 ADNIMERGE 방문일 간 차이가 threshold(180일)를 초과하는 케이스 발생.
+
+| 프로토콜 | Error 스캔 | 전체 스캔 | Error율 |
+|----------|-----------|-----------|---------|
+| ADNI1 | 2 | 9,115 | 0.02% |
+| ADNIGO | 0 | 1,193 | 0.00% |
+| ADNI2 | 2 | 9,313 | 0.02% |
+| **ADNI3** | **16** | **2,650** | **0.6%** |
+| **ADNI4** | **8** | **1,149** | **0.7%** |
+
+**원인**: Screening MRI가 enrollment 전에 촬영되었으나, ADNIMERGE에는 enrollment 이후 방문만 기록. ADNI4 error 8건 모두 촬영일이 ADNIMERGE 첫 방문보다 186~261일 전.
+
+**AQUDATE-EXAMDATE gap 분포 (정상 매칭 스캔)**:
+
+| 프로토콜 | Median gap | >90일 비율 |
+|----------|-----------|-----------|
+| ADNI1 | 3일 | 0.5% |
+| ADNI2 | 0일 | 0.8% |
+| ADNI3 | 8일 | 4.3% |
+| ADNI4 | 19일 | 8.2% |
+
+ADNI4로 갈수록 gap 증가 — 원격/분산 촬영 증가, screening-enrollment 간 지연.
+
+### 5.4. ADNIMERGE 임상 변수 비교
+
+LONI 제공 레퍼런스 CSV(`ADNIMERGE_240821.csv`, 16,421행)와 Python 빌드(`ADNIMERGE_260213.csv`, 23,479행) 비교.
+
+#### (A) 핵심 임상 변수 (99~100% 일치)
+
+| 변수 | 비교 건수 | 일치율 |
+|------|----------|--------|
+| SITE, PTEDUCAT, PTETHCAT, PTMARRY | 16,411 | **100%** |
+| RAVLT_immediate, RAVLT_learning, DIGITSCOR | 3,800~16,410 | **100%** |
+| CDRSB, FAQ, TRABSCOR, LDELTOTAL | 9,441~11,745 | **99.9%+** |
+| DX (방문별 진단) | 11,457 | **99.9%** |
+| MMSE | 11,468 | **98.5%** |
+| MOCA | 2,447 | **90.0%** |
+
+MMSE/MOCA 불일치는 .rda 소스 데이터 업데이트(2024→2026)에 의한 것.
+
+#### (B) DX_bl — ARM.rda 연동 (91.3% 일치)
+
+- ADNI1/GO/2: ARM.rda enrollment group 기준 (EMCI/LMCI/SMC/CN/AD 유지)
+- ADNI3/4: ADSL.DX + DXSUM.DIAGNOSIS 기준 (CN/MCI/AD만)
+- 잔여 불일치 8.7%는 ADNI3의 ARM.rda 미포함에 기인
+
+#### (C) 데이터 소스 변경 (의도된 차이)
+
+| 변수 | 일치율 | Ref 소스 | New 소스 | 비고 |
+|------|--------|----------|----------|------|
+| Hippocampus | ~93% | UCSFFSX (FS 4.x) | UCSFFSX51 (FS 5.1) | r=0.998 |
+| ICV | ~93% | UCSFFSX | UCSFFSX51 | r=0.997 |
+| WholeBrain, Entorhinal 등 | ~0% | UCSFFSX | UCSFFSX51 | atlas/ROI 정의 변경 |
+| Ventricles | ~0% | UCSFFSX | UCSDVOL | 다른 파이프라인, r=0.995 |
+| AV45 (amyloid PET) | ~24% | 8mm SUVR | AMY_6MM SUMMARY_SUVR | r=0.998, 해상도 변경 |
+| FDG (FDG PET) | ~6% | UCBERKELEYFDG (구) | UCBERKELEYFDG_8mm MetaROI | r=0.847, 파이프라인 세대교체 |
+| ABETA/TAU/PTAU (CSF) | ~7-10% | Luminex 단독 | MASTER + Elecsys 병합 | 플랫폼 교체 |
+| ADAS11/13 | ~69% | 정수 | 소수점 (Q4 sub-scoring) | r=0.999, round 시 99.7% |
+| AGE | ~60% | ADSL AGE | ADSL AGE | r≈1.000, 소수점 반올림 차이 |
+
+MRI 용적 소스 선택 근거: UCSFFSX51(4,896행, 1,067명)이 coverage 최대. UCSDVOL(3,128행, 811명)은 Ventricles(lateral ventricle)만 사용 — FreeSurfer에는 lateral ventricle 컬럼이 없기 때문.
+
+CSF 소스 선택 근거: ADNI3 이후 Elecsys로 전환되어 Luminex 단독 사용 시 최신 데이터 누락. ADNIMERGE2 패키지 설계에 따라 MASTER + ELECSYS 병합 사용. ([Shaw et al. 2019](https://www.nature.com/articles/s41598-019-54204-z))
+
+### 5.5. 검증 요약
+
+| 범주 | 결과 |
 |------|------|
-| 공통 행 (PTID+VISCODE) | 11,692 (ref 커버리지 99.8%) |
-| T1 ImageUID 일치 | **100.0%** (11,018/11,021) |
-| PET ImageUID 일치 (AV45/AV1451/FBB) | **100.0%** |
-| T2_FSE ImageUID 일치 | 99.5% |
-| T2_TSE/STAR ImageUID 일치 | 99.9% |
-| 촬영일(AQUDATE) 일치 | 전 모달리티 **100.0%** |
-
-### ADNI4 (ref 대비, AQUDATE 기준)
-
-| 모달리티 | 일치율 | 비고 |
-|----------|--------|------|
-| PET (AV45/AV1451/FBB/MK6240) | **100.0%** | — |
-| T2_3D | **100.0%** | — |
-| FLAIR | 96.9% | VISCODE 체계 차이 영향 |
-| T1 | 89.2% | VISCODE 차이 + 다중 시리즈 선택 차이 |
-| T2_STAR | 26.6% | 세션당 최대 10 시리즈, VISCODE 차이 증폭 |
-
-ADNI4의 낮은 일치율은 **VISCODE 체계 차이** (ref: `4_sc/4_init/4_m12`, new: `m000/m003/m012`)에 기인하며, 파이프라인 버그가 아니다.
-
-### 임상 변수 (ADNIMERGE)
-
-| 범주 | 일치율 | 비고 |
-|------|--------|------|
-| 인구통계 (SITE, PTEDUCAT 등) | **100%** | — |
-| 인지검사 (CDRSB, FAQ 등) | **99.9%+** | .rda 데이터 업데이트 |
-| DX_bl (기저 진단) | **91.3%** | ARM.rda 연동 (ADNI3 ARM 미포함 8.7%) |
-| MRI 용적 (Hippocampus/ICV) | **~93%** | UCSFFSX51 primary (FS 5.1) |
-| CSF 바이오마커 | ~7-10% | Luminex→Elecsys 플랫폼 교체 (의도된 변경) |
-
-상세: [`docs/matching_validation_report.md`](docs/matching_validation_report.md), [`docs/column_diff_report.md`](docs/column_diff_report.md)
+| **영상 매칭 (ADNI1/GO/2/3)** | T1/PET **100%**, T2 99.5~99.9% |
+| **영상 매칭 (ADNI4)** | PET/T2_3D **100%**, T1 89.2% (VISCODE 체계 차이) |
+| **핵심 임상 변수** | 인구통계 **100%**, 인지검사 **98.5~100%** |
+| **DX_bl** | **91.3%** (ARM.rda 연동, ADNI3 ARM 부재 8.7%) |
+| **MRI 용적** | Hippocampus/ICV **~93%** (UCSFFSX51 전환) |
+| **바이오마커** | 의도된 소스 변경 (Elecsys, 6mm PET 등) |
 
 ---
 
@@ -221,20 +320,3 @@ pip install -r requirements.txt
 | pydicom | DICOM 메타데이터 추출 |
 | pyreadr | .rda 파일 읽기 |
 | joblib | 병렬 처리 |
-
----
-
-## 데이터 흐름
-
-```
-ADNIMERGE2/data/*.rda (217개)
-    │
-    ▼  adnimerge_py
-ADNIMERGE_{DATE}.csv + MRIQC.csv + APOERES.csv
-    │
-    ▼  adni_matching
-DCM 인벤토리 + ADNIMERGE 매칭
-    │
-    ▼
-{MOD}_all.csv → {MOD}_unique.csv → MERGED.csv
-```

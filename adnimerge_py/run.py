@@ -6,8 +6,6 @@ run.py — adnimerge_py CLI 진입점
 
     --convert-all       217개 .rda -> CSV 전체 변환
     --build-adnimerge   ADNIMERGE_{DATE}.csv 구축
-    --build-mriqc       MRIQC_{DATE}.csv 구축
-    --build-apoeres     APOERES_{DATE}.csv 구축
     --build-ucberkeley  UCBERKELEY PET CSVs 구축 (FDG, AMY, TAU, TAUPVC)
     --all               전부 실행 (기본)
     --rda-dir DIR       .rda 소스 디렉토리 (기본: ADNIMERGE2/data)
@@ -48,10 +46,6 @@ def main():
                         help='Convert all 217 .rda files to CSV')
     parser.add_argument('--build-adnimerge', action='store_true',
                         help='Build ADNIMERGE_{DATE}.csv')
-    parser.add_argument('--build-mriqc', action='store_true',
-                        help='Build MRIQC_{DATE}.csv')
-    parser.add_argument('--build-apoeres', action='store_true',
-                        help='Build APOERES_{DATE}.csv')
     parser.add_argument('--build-ucberkeley', action='store_true',
                         help='Build UCBERKELEY PET CSVs (FDG, AMY, TAU, TAUPVC)')
     parser.add_argument('--all', action='store_true',
@@ -70,7 +64,6 @@ def main():
 
     # If no specific action requested, run all
     run_all = args.all or not (args.convert_all or args.build_adnimerge
-                                or args.build_mriqc or args.build_apoeres
                                 or args.build_ucberkeley)
 
     date_str = args.date or datetime.now().strftime('%y%m%d')
@@ -102,21 +95,7 @@ def main():
         logging.info('--- Building ADNIMERGE CSV ---')
         build_adnimerge(args.rda_dir, args.output_dir, date_str)
 
-    # Step 3: Build MRIQC CSV
-    if run_all or args.build_mriqc:
-        from adnimerge_py.build_adnimerge import build_mriqc
-        logging.info('')
-        logging.info('--- Building MRIQC CSV ---')
-        build_mriqc(args.rda_dir, args.output_dir, date_str)
-
-    # Step 4: Build APOERES CSV
-    if run_all or args.build_apoeres:
-        from adnimerge_py.build_adnimerge import build_apoeres
-        logging.info('')
-        logging.info('--- Building APOERES CSV ---')
-        build_apoeres(args.rda_dir, args.output_dir, date_str)
-
-    # Step 5: Build UCBERKELEY PET CSVs
+    # Step 3: Build UCBERKELEY PET CSVs
     if run_all or args.build_ucberkeley:
         from adnimerge_py.build_adnimerge import build_all_ucberkeley
         logging.info('')

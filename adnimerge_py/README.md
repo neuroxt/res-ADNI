@@ -27,8 +27,6 @@ ADNIMERGE2 R 패키지의 전체 로직을 Python/pandas로 1:1 이식하여,
 ### build_adnimerge.py
 
 - **`build_adnimerge(rda_dir, output_dir, date_str)`** — 12단계 빌드 프로세스로 ADNIMERGE CSV 생성.
-- **`build_mriqc(rda_dir, output_dir, date_str)`** — MRIQC.rda + REGISTRY → MRIQC CSV.
-- **`build_apoeres(rda_dir, output_dir, date_str)`** — APOERES.rda + REGISTRY → APOERES CSV.
 - 헬퍼: `load_rda()`, `standardize_viscode()`, `convert_ecog_to_numeric()`, `first_non_na()`, `_group_first_non_na()`
 
 ### compare_ref.py
@@ -61,7 +59,6 @@ python -m adnimerge_py
 
 # 개별 단계만 실행
 python -m adnimerge_py --build-adnimerge
-python -m adnimerge_py --build-mriqc
 python -m adnimerge_py --convert-all
 
 # 옵션 지정
@@ -74,8 +71,6 @@ python -m adnimerge_py --rda-dir /path/to/ADNIMERGE2/data --output-dir /path/to/
 |------|------|--------|
 | `--convert-all` | 217개 .rda → CSV 일괄 변환 | — |
 | `--build-adnimerge` | ADNIMERGE_{DATE}.csv 빌드 | — |
-| `--build-mriqc` | MRIQC_{DATE}.csv 빌드 | — |
-| `--build-apoeres` | APOERES_{DATE}.csv 빌드 | — |
 | `--all` | 전체 실행 (플래그 미지정 시 기본) | — |
 | `--rda-dir DIR` | .rda 소스 디렉토리 | `ADNIMERGE2/data` |
 | `--output-dir DIR` | 출력 디렉토리 | `csv/` |
@@ -88,10 +83,8 @@ python -m adnimerge_py --rda-dir /path/to/ADNIMERGE2/data --output-dir /path/to/
 
 | 파일 | 위치 | 설명 |
 |------|------|------|
-| `csv/tables/*.csv` | 217개 | .rda 원본 1:1 CSV 변환 |
+| `csv/tables/*.csv` | 217개 | .rda 원본 1:1 CSV 변환 (MRIQC.csv, APOERES.csv 포함) |
 | `csv/ADNIMERGE_{DATE}.csv` | 1개 | 12단계 빌드 최종 결과 |
-| `csv/MRIQC_{DATE}.csv` | 1개 | MRI QC 메타데이터 |
-| `csv/APOERES_{DATE}.csv` | 1개 | APOE 유전형 |
 
 ---
 
