@@ -1,4 +1,4 @@
-# adnimerge_py
+# adni.extraction
 
 > LONI ADNIMERGE2 R 패키지의 .rda 추출 파이프라인을 Python으로 이식한 패키지.
 
@@ -12,11 +12,11 @@ ADNIMERGE2 R 패키지의 전체 로직을 Python/pandas로 1:1 이식하여,
 | 파일 | 줄 수 | 역할 |
 |------|-------|------|
 | `__init__.py` | 3 | 패키지 메타 (`__version__ = '1.0.0'`) |
-| `__main__.py` | 4 | `python -m adnimerge_py` 진입점 |
+| `__main__.py` | 4 | `python -m adni.extraction` 진입점 |
 | `rda_converter.py` | 112 | .rda → CSV 일괄 변환기 |
 | `build_adnimerge.py` | 1,051 | ADNIMERGE + UCBERKELEY PET 빌드 로직 |
 | `compare_ref.py` | 167 | REF vs NEW CSV 비교 유틸리티 |
-| `run.py` | 122 | CLI 인터페이스 (argparse) |
+| `cli.py` | 122 | CLI 인터페이스 (argparse) |
 
 ### rda_converter.py
 
@@ -32,12 +32,12 @@ ADNIMERGE2 R 패키지의 전체 로직을 Python/pandas로 1:1 이식하여,
 ### compare_ref.py
 
 - **`compare_csvs(ref_path, new_path, cols, tolerance)`** — PTID+VISCODE 기준 inner join → 컬럼별 일치율, 불일치 건수, Pearson r.
-- CLI: `python adnimerge_py/compare_ref.py REF.csv NEW.csv --cols DX_bl MMSE`
+- CLI: `python adni/extraction/compare_ref.py REF.csv NEW.csv --cols DX_bl MMSE`
 
-### run.py
+### cli.py
 
 - argparse 기반 CLI. 플래그 미지정 시 전체 실행 (`--all`과 동일).
-- `python -m adnimerge_py` 또는 `python adnimerge_py/run.py`로 실행.
+- `python -m adni.extraction` 또는 `python adni/extraction/cli.py`로 실행.
 
 ---
 
@@ -55,14 +55,14 @@ numpy      # 수치 연산
 
 ```bash
 # 전체 실행 (rda 변환 + ADNIMERGE + UCBERKELEY PET)
-python -m adnimerge_py
+python -m adni.extraction
 
 # 개별 단계만 실행
-python -m adnimerge_py --build-adnimerge
-python -m adnimerge_py --convert-all
+python -m adni.extraction --build-adnimerge
+python -m adni.extraction --convert-all
 
 # 옵션 지정
-python -m adnimerge_py --rda-dir /path/to/ADNIMERGE2/data --output-dir /path/to/csv --date 260212 -v
+python -m adni.extraction --rda-dir /path/to/ADNIMERGE2/data --output-dir /path/to/csv --date 260212 -v
 ```
 
 ### CLI 옵션

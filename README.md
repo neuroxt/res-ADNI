@@ -11,13 +11,13 @@ NFS 서버의 DICOM 파일과 매칭하여 통합 CSV(`MERGED.csv`)를 생성한
 ## 프로젝트 구조
 
 ```
-ADNI_match/
-├── ADNIMERGE2/          # LONI ADNIMERGE2 R 패키지 (원본, 수정 금지)
-├── adnimerge_py/        # Part 1: .rda → ADNIMERGE CSV 추출
-├── adni_matching/       # Part 2: DICOM 매칭 파이프라인
-│   └── orig/            #   레퍼런스 코드 (XML 기반, 수정 금지)
-├── scripts/             # 검증 및 유틸리티 스크립트
-└── ini/                 # 설정 예시
+res-ADNI/
+├── adni/                # Python 패키지
+│   ├── extraction/      #   Part 1: .rda → ADNIMERGE CSV 추출
+│   └── matching/        #   Part 2: DICOM 매칭 파이프라인
+│       └── reference/   #     레퍼런스 코드 (XML 기반, 수정 금지)
+├── vendor/ADNIMERGE2/   # LONI ADNIMERGE2 R 패키지 (원본, 수정 금지)
+└── scripts/             # 검증 및 유틸리티 스크립트
 ```
 
 ---
@@ -25,15 +25,15 @@ ADNI_match/
 ## 데이터 흐름
 
 ```
-ADNIMERGE2/data/*.rda (217개)
+vendor/ADNIMERGE2/data/*.rda (217개)
     │
-    ▼  adnimerge_py (rda_converter)
+    ▼  adni.extraction (rda_converter)
 csv/tables/*.csv (217개 1:1 변환, MRIQC.csv·APOERES.csv 포함)
     │
-    ▼  adnimerge_py (build_adnimerge)
+    ▼  adni.extraction (build_adnimerge)
 ADNIMERGE_{DATE}.csv (23,479행 × 132열)
     │
-    ▼  adni_matching
+    ▼  adni.matching
 DCM 인벤토리 + ADNIMERGE 매칭
     │
     ▼
@@ -53,7 +53,7 @@ LONI ATRI Biostatistics에서 제공하는 R 데이터 패키지.
 
 ---
 
-## 2. adnimerge_py (ADNIMERGE CSV 추출)
+## 2. adni.extraction (ADNIMERGE CSV 추출)
 
 ADNIMERGE2 R 패키지의 빌드 로직을 Python/pandas로 1:1 이식한 패키지.
 `.rda` 원본에서 직접 ADNIMERGE CSV를 생성한다.
@@ -65,7 +65,7 @@ ADNIMERGE2 R 패키지의 빌드 로직을 Python/pandas로 1:1 이식한 패키
 | `build_adnimerge.py` | 12단계 빌드 프로세스로 ADNIMERGE CSV 생성 |
 | `rda_converter.py` | .rda → CSV 일괄 변환 (217개 테이블) |
 | `compare_ref.py` | 레퍼런스 CSV 대비 비교 검증 |
-| `run.py` | CLI 인터페이스 |
+| `cli.py` | CLI 인터페이스 |
 
 ### 12단계 빌드 프로세스
 
@@ -88,14 +88,14 @@ ADNIMERGE2 R 패키지의 빌드 로직을 Python/pandas로 1:1 이식한 패키
 
 ```bash
 # 전체 실행 (rda 변환 + ADNIMERGE 빌드)
-python -m adnimerge_py
+python -m adni.extraction
 
 # 개별 단계
-python -m adnimerge_py --build-adnimerge
-python -m adnimerge_py --convert-all
+python -m adni.extraction --build-adnimerge
+python -m adni.extraction --convert-all
 
 # 옵션
-python -m adnimerge_py --rda-dir /path/to/ADNIMERGE2/data --output-dir /path/to/csv --date 260213 -v
+python -m adni.extraction --rda-dir /path/to/ADNIMERGE2/data --output-dir /path/to/csv --date 260213 -v
 ```
 
 ### 출력
@@ -105,11 +105,11 @@ python -m adnimerge_py --rda-dir /path/to/ADNIMERGE2/data --output-dir /path/to/
 | `ADNIMERGE_{DATE}.csv` | 23,479행 × 132열, 4,498 피험자 |
 | `tables/*.csv` | 217개 .rda 1:1 CSV 변환 (MRIQC.csv, APOERES.csv 등 포함) |
 
-상세 설명: [`adnimerge_py/README.md`](adnimerge_py/README.md)
+상세 설명: [`adni/extraction/README.md`](adni/extraction/README.md)
 
 ---
 
-## 3. adni_matching (DICOM 매칭 파이프라인)
+## 3. adni.matching (DICOM 매칭 파이프라인)
 
 XML 메타데이터를 완전히 제거하고, 경로 파싱 + ADNIMERGE + MRIQC + pydicom으로
 DICOM 영상을 임상 데이터와 매칭하는 v4 파이프라인.
@@ -120,9 +120,9 @@ DICOM 영상을 임상 데이터와 매칭하는 v4 파이프라인.
 |------|------|
 | `config.py` | 모달리티별 설정, 경로, 상수 |
 | `inventory.py` | DCM 디렉토리 스캔 → 모달리티별 인벤토리 |
-| `matching.py` | 이미지-ADNIMERGE 매칭 (핵심 로직) |
+| `matcher.py` | 이미지-ADNIMERGE 매칭 (핵심 로직) |
 | `merge.py` | `*_unique.csv` → `MERGED.csv` 병합 |
-| `run_pipeline.py` | CLI 오케스트레이션 |
+| `cli.py` | CLI 오케스트레이션 |
 | `utils.py` | 로깅, 경로 추출, DICOM 유틸 |
 
 ### 매칭 로직
@@ -144,13 +144,13 @@ DICOM 영상을 임상 데이터와 매칭하는 v4 파이프라인.
 
 ```bash
 # 전체 파이프라인
-python -m adni_matching.run_pipeline --adnimerge /path/to/ADNIMERGE.csv --output /path/to/output
+python -m adni.matching --adnimerge /path/to/ADNIMERGE.csv --output /path/to/output
 
 # 특정 모달리티만
-python -m adni_matching.run_pipeline --modalities T1 AV45_6MM
+python -m adni.matching --modality T1,AV45_6MM
 
 # 병합만 (이미 매칭된 CSV가 있을 때)
-python -m adni_matching.run_pipeline --merge-only --output /path/to/output
+python -m adni.matching --merge-only --output /path/to/output
 ```
 
 ### 출력
@@ -166,7 +166,7 @@ python -m adni_matching.run_pipeline --merge-only --output /path/to/output
 - **`_all.csv`**: 매칭된 모든 결과. 동일 피험자-방문에 여러 스캔이 있으면 중복 행 포함, VISCODE 매핑 실패(`error`) 행 포함.
 - **`_unique.csv`**: PTID × VISCODE_FIX 조합당 1행만 유지 (중복 시 마지막 항목, error 행 제외). MERGED.csv는 이 파일들을 병합하여 생성.
 
-### 레퍼런스 코드 (`orig/`)
+### 레퍼런스 코드 (`reference/`)
 
 `ADNI.py`와 `params.py`는 XML 기반의 기존 매칭 코드로, 로직 참조용으로만 보관한다. 수정하지 않는다.
 

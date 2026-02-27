@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-run_pipeline.py — 전체 매칭 파이프라인 실행
+cli.py — 전체 매칭 파이프라인 실행
 
 기존 10_run_matching_merged.py + ADNI.py를 대체하는 XML-free 파이프라인.
 
 사용법:
-    python -m adni_matching.run_pipeline [OPTIONS]
+    python -m adni.matching [OPTIONS]
 
     --modality T1,AV45,...    실행할 모달리티 (쉼표 구분, 기본: 전체)
     --merge-only              MERGED.csv만 생성
@@ -23,14 +23,14 @@ import logging
 
 # 프로젝트 루트를 sys.path에 추가
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 sys.path.insert(0, PROJECT_ROOT)
 
-from adni_matching.config import NFS_BASE, OUTPUT_BASE, MODALITY_CONFIG, UCBERKELEY_ATTACH_CONFIG
-from adni_matching.utils import setup_logger
-from adni_matching.inventory import build_inventory, save_inventory, load_inventory
-from adni_matching.matching import match_modality, attach_ucberkeley
-from adni_matching.merge import unique_csv_merge
+from adni.matching.config import NFS_BASE, OUTPUT_BASE, MODALITY_CONFIG, UCBERKELEY_ATTACH_CONFIG
+from adni.matching.utils import setup_logger
+from adni.matching.inventory import build_inventory, save_inventory, load_inventory
+from adni.matching.matcher import match_modality, attach_ucberkeley
+from adni.matching.merge import unique_csv_merge
 from glob import glob
 
 # =============================================================================
@@ -201,7 +201,7 @@ def main():
     # 사전 검사
     if not os.path.isfile(args.adnimerge):
         logging.error('ADNIMERGE CSV not found: %s' % args.adnimerge)
-        logging.error('Run: python -m adnimerge_py --build-adnimerge')
+        logging.error('Run: python -m adni.extraction --build-adnimerge')
         sys.exit(1)
 
     # Merge-only 모드
