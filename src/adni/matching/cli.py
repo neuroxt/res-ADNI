@@ -21,9 +21,9 @@ import sys
 import argparse
 import logging
 
-# 프로젝트 루트 (adni/matching/cli.py → adni/matching → adni → project root)
+# 프로젝트 루트 (src/adni/matching/cli.py → matching → adni → src → project root)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_DIR)))
 sys.path.insert(0, PROJECT_ROOT)
 
 from adni.matching.config import NFS_BASE, OUTPUT_BASE, MODALITY_CONFIG, UCBERKELEY_ATTACH_CONFIG
