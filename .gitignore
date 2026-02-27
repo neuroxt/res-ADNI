@@ -11,6 +11,9 @@ build/
 csv/
 *.csv
 
+# Generated reports
+reports/
+
 # R build artifacts
 ADNIMERGE2/build/
 

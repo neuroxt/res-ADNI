@@ -23,7 +23,7 @@ DEFAULT_NEW_MERGED = os.path.join(
 DEFAULT_REF_MERGED = os.path.join(PROJECT_ROOT, 'csv', 'ref', 'MERGED.csv')
 DEFAULT_REF_ADNI4 = os.path.join(PROJECT_ROOT, 'csv', 'ref', 'merged_adni4.csv')
 DEFAULT_ADNIMERGE = os.path.join(PROJECT_ROOT, 'csv', 'ADNIMERGE_260213.csv')
-DEFAULT_OUTPUT = os.path.join(PROJECT_ROOT, 'docs', 'matching_validation_report.md')
+DEFAULT_OUTPUT = os.path.join(PROJECT_ROOT, 'reports', 'matching_validation_report.md')
 DEFAULT_DCM_INVENTORY = os.path.join(
     '/Volumes/nfs_storage/1_combined/ADNI_New/ORIG/DCM/DEMO/ADNI_matching_v4',
     'dcm_inventory.json')
