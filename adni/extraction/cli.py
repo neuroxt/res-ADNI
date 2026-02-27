@@ -1,14 +1,14 @@
 """
-run.py — adnimerge_py CLI 진입점
+cli.py — adni.extraction CLI 진입점
 
 사용법:
-    python -m adnimerge_py [OPTIONS]
+    python -m adni.extraction [OPTIONS]
 
     --convert-all       217개 .rda -> CSV 전체 변환
     --build-adnimerge   ADNIMERGE_{DATE}.csv 구축
     --build-ucberkeley  UCBERKELEY PET CSVs 구축 (FDG, AMY, TAU, TAUPVC)
     --all               전부 실행 (기본)
-    --rda-dir DIR       .rda 소스 디렉토리 (기본: ADNIMERGE2/data)
+    --rda-dir DIR       .rda 소스 디렉토리 (기본: vendor/ADNIMERGE2/data)
     --output-dir DIR    출력 디렉토리 (기본: csv/)
     --date DATE         출력 날짜 문자열 YYMMDD (기본: 오늘)
 """
@@ -19,11 +19,11 @@ import argparse
 import logging
 from datetime import datetime
 
-# 프로젝트 루트
+# 프로젝트 루트 (adni/extraction/cli.py → adni/extraction → adni → project root)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 
-DEFAULT_RDA_DIR = os.path.join(PROJECT_ROOT, 'ADNIMERGE2', 'data')
+DEFAULT_RDA_DIR = os.path.join(PROJECT_ROOT, 'vendor', 'ADNIMERGE2', 'data')
 DEFAULT_OUTPUT_DIR = os.path.join(PROJECT_ROOT, 'csv')
 DEFAULT_TABLES_DIR = os.path.join(DEFAULT_OUTPUT_DIR, 'tables')
 
@@ -70,7 +70,7 @@ def main():
     tables_dir = os.path.join(args.output_dir, 'tables')
 
     logging.info('=' * 60)
-    logging.info('adnimerge_py — .rda -> CSV Conversion')
+    logging.info('adni.extraction — .rda -> CSV Conversion')
     logging.info('=' * 60)
     logging.info('RDA dir: %s', args.rda_dir)
     logging.info('Output dir: %s', args.output_dir)
@@ -82,7 +82,7 @@ def main():
 
     # Step 1: Convert all .rda -> individual CSVs
     if run_all or args.convert_all:
-        from adnimerge_py.rda_converter import convert_all_rda, print_report
+        from adni.extraction.rda_converter import convert_all_rda, print_report
         logging.info('')
         logging.info('--- Converting all .rda files ---')
         results = convert_all_rda(args.rda_dir, tables_dir)
@@ -90,14 +90,14 @@ def main():
 
     # Step 2: Build ADNIMERGE CSV
     if run_all or args.build_adnimerge:
-        from adnimerge_py.build_adnimerge import build_adnimerge
+        from adni.extraction.build_adnimerge import build_adnimerge
         logging.info('')
         logging.info('--- Building ADNIMERGE CSV ---')
         build_adnimerge(args.rda_dir, args.output_dir, date_str)
 
     # Step 3: Build UCBERKELEY PET CSVs
     if run_all or args.build_ucberkeley:
-        from adnimerge_py.build_adnimerge import build_all_ucberkeley
+        from adni.extraction.build_adnimerge import build_all_ucberkeley
         logging.info('')
         logging.info('--- Building UCBERKELEY PET CSVs ---')
         build_all_ucberkeley(args.rda_dir, args.output_dir, date_str)

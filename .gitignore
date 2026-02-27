@@ -15,7 +15,7 @@ csv/
 reports/
 
 # R build artifacts
-ADNIMERGE2/build/
+vendor/ADNIMERGE2/build/
 
 # macOS
 .DS_Store

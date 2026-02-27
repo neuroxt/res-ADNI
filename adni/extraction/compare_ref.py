@@ -3,8 +3,8 @@
 PTID+VISCODE 기준 inner join → 컬럼별 일치율, 불일치 건수, Pearson r (수치형).
 
 Usage:
-    python adnimerge_py/compare_ref.py csv/ref/ADNIMERGE_240821.csv csv/ADNIMERGE_260213.csv
-    python adnimerge_py/compare_ref.py REF.csv NEW.csv --cols DX_bl MMSE MOCA
+    python adni/extraction/compare_ref.py csv/ref/ADNIMERGE_240821.csv csv/ADNIMERGE_260213.csv
+    python adni/extraction/compare_ref.py REF.csv NEW.csv --cols DX_bl MMSE MOCA
 """
 
 import argparse

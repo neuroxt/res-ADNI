@@ -11,7 +11,7 @@ import warnings
 from joblib import Parallel, delayed
 
 try:
-    from adni_matching.params import *
+    from adni.matching.reference.params import *
 except ImportError:
     from params import *
 
