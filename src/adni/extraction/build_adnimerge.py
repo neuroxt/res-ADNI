@@ -1235,3 +1235,49 @@ def build_all_ucberkeley(rda_dir: str, output_dir: str, date_str: str = None):
     built = sum(1 for v in results.values() if v is not None)
     logger.info('UCBerkeley PET CSVs: %d/4 built', built)
     return results
+
+
+# =============================================================================
+# birth_dates.csv 생성
+# =============================================================================
+
+def build_birth_dates(rda_dir: str, output_dir: str):
+    """PTDEMOG PTDOB (MM/YYYY) → birth_dates.csv (PTID, est_birth_date) 생성.
+
+    est_birth_date = YYYY-MM-15 (월 중간일 기준, 평균 0.58일 오차).
+    """
+    tables_dir = os.path.join(output_dir, 'tables')
+    ptdemog = load_rda(os.path.join(rda_dir, 'PTDEMOG.rda'),
+                       csv_fallback_dir=tables_dir)
+    if ptdemog is None:
+        logger.error('PTDEMOG not found, cannot build birth_dates.csv')
+        return None
+
+    if 'PTID' not in ptdemog.columns or 'PTDOB' not in ptdemog.columns:
+        logger.error('PTDEMOG missing PTID or PTDOB columns')
+        return None
+
+    # PTID당 첫 번째 유효 PTDOB
+    demog = ptdemog[['PTID', 'PTDOB']].dropna(subset=['PTDOB']).drop_duplicates()
+    demog = demog.groupby('PTID', sort=False).first().reset_index()
+
+    def _parse_ptdob(dob_str):
+        if pd.isna(dob_str) or not isinstance(dob_str, str):
+            return ''
+        parts = str(dob_str).strip().split('/')
+        if len(parts) == 2:
+            month, year = parts[0], parts[1]
+            try:
+                return '%s-%s-15' % (year, month.zfill(2))
+            except (ValueError, TypeError):
+                return ''
+        return ''
+
+    demog['est_birth_date'] = demog['PTDOB'].apply(_parse_ptdob)
+    demog = demog[demog['est_birth_date'] != '']
+
+    out = demog[['PTID', 'est_birth_date']]
+    out_path = os.path.join(output_dir, 'birth_dates.csv')
+    out.to_csv(out_path, index=False)
+    logger.info('birth_dates.csv: %d subjects -> %s', len(out), out_path)
+    return out

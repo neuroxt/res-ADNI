@@ -204,6 +204,10 @@ def main():
         logging.error('Run: python -m adni.extraction --build-adnimerge')
         sys.exit(1)
 
+    if not os.path.isfile(args.birth_dates):
+        logging.warning('birth_dates CSV not found: %s' % args.birth_dates)
+        logging.warning('subjectAge will be empty. Run: python -m adni.extraction --build-birth-dates')
+
     # Merge-only 모드
     if args.merge_only:
         unique_csv_merge(args.output_dir, exclude_modalities=MERGE_EXCLUDE)

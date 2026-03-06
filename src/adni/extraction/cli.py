@@ -4,13 +4,14 @@ cli.py — adni.extraction CLI 진입점
 사용법:
     python -m adni.extraction [OPTIONS]
 
-    --convert-all       217개 .rda -> CSV 전체 변환
-    --build-adnimerge   ADNIMERGE_{DATE}.csv 구축
-    --build-ucberkeley  UCBERKELEY PET CSVs 구축 (FDG, AMY, TAU, TAUPVC)
-    --all               전부 실행 (기본)
-    --rda-dir DIR       .rda 소스 디렉토리 (기본: vendor/ADNIMERGE2/data)
-    --output-dir DIR    출력 디렉토리 (기본: csv/)
-    --date DATE         출력 날짜 문자열 YYMMDD (기본: 오늘)
+    --convert-all        217개 .rda -> CSV 전체 변환
+    --build-adnimerge    ADNIMERGE_{DATE}.csv 구축
+    --build-ucberkeley   UCBERKELEY PET CSVs 구축 (FDG, AMY, TAU, TAUPVC)
+    --build-birth-dates  birth_dates.csv 생성 (PTDEMOG PTDOB → est_birth_date)
+    --all                전부 실행 (기본)
+    --rda-dir DIR        .rda 소스 디렉토리 (기본: vendor/ADNIMERGE2/data)
+    --output-dir DIR     출력 디렉토리 (기본: csv/)
+    --date DATE          출력 날짜 문자열 YYMMDD (기본: 오늘)
 """
 
 import os
@@ -48,6 +49,8 @@ def main():
                         help='Build ADNIMERGE_{DATE}.csv')
     parser.add_argument('--build-ucberkeley', action='store_true',
                         help='Build UCBERKELEY PET CSVs (FDG, AMY, TAU, TAUPVC)')
+    parser.add_argument('--build-birth-dates', action='store_true',
+                        help='Build birth_dates.csv from PTDEMOG PTDOB')
     parser.add_argument('--all', action='store_true',
                         help='Run all steps (default if no flags given)')
     parser.add_argument('--rda-dir', type=str, default=DEFAULT_RDA_DIR,
@@ -64,7 +67,7 @@ def main():
 
     # If no specific action requested, run all
     run_all = args.all or not (args.convert_all or args.build_adnimerge
-                                or args.build_ucberkeley)
+                                or args.build_ucberkeley or args.build_birth_dates)
 
     date_str = args.date or datetime.now().strftime('%y%m%d')
     tables_dir = os.path.join(args.output_dir, 'tables')
@@ -101,6 +104,13 @@ def main():
         logging.info('')
         logging.info('--- Building UCBERKELEY PET CSVs ---')
         build_all_ucberkeley(args.rda_dir, args.output_dir, date_str)
+
+    # Step 4: Build birth_dates.csv
+    if run_all or args.build_birth_dates:
+        from adni.extraction.build_adnimerge import build_birth_dates
+        logging.info('')
+        logging.info('--- Building birth_dates.csv ---')
+        build_birth_dates(args.rda_dir, args.output_dir)
 
     logging.info('')
     logging.info('=' * 60)
