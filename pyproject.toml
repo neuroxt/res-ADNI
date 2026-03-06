@@ -4,14 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "res-cohort-matching"
-version = "4.0.0"
-description = "Multi-cohort neuroimaging data extraction and DICOM matching pipeline"
+version = "4.1.0"
+description = "Multi-cohort neuroimaging data extraction and matching pipeline (ADNI + A4/LEARN)"
 requires-python = ">=3.9"
 dependencies = ["numpy", "pandas", "pydicom", "pyreadr", "joblib"]
 
 [project.scripts]
 adni-extract = "adni.extraction.cli:main"
 adni-match = "adni.matching.cli:main"
+a4-pipeline = "a4.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
