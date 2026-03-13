@@ -29,7 +29,7 @@ sys.path.insert(0, PROJECT_ROOT)
 from adni.matching.config import NFS_BASE, OUTPUT_BASE, MODALITY_CONFIG, UCBERKELEY_ATTACH_CONFIG
 from adni.matching.utils import setup_logger
 from adni.matching.inventory import build_inventory, save_inventory, load_inventory
-from adni.matching.matching import match_modality, attach_ucberkeley
+from adni.matching.matching import match_modality, attach_ucberkeley, enrich_protocol_from_mriqc, enrich_protocol_from_dcm_inventory
 from adni.matching.merge import unique_csv_merge
 from glob import glob
 
@@ -40,14 +40,15 @@ from glob import glob
 # 출력 디렉토리
 DEFAULT_OUTPUT_DIR = os.path.join(OUTPUT_BASE, 'DEMO', 'ADNI_matching_v4')
 
-# CSV 경로 (csv/ 디렉토리 기준)
-DEFAULT_ADNIMERGE_CSV = os.path.join(PROJECT_ROOT, 'csv', 'ADNIMERGE_260213.csv')
-DEFAULT_MRIQC_CSV = os.path.join(PROJECT_ROOT, 'csv', 'tables', 'MRIQC.csv')
-DEFAULT_APOERES_CSV = os.path.join(PROJECT_ROOT, 'csv', 'tables', 'APOERES.csv')
-DEFAULT_BIRTH_DATES_CSV = os.path.join(PROJECT_ROOT, 'csv', 'birth_dates.csv')
+# CSV 경로 (NFS DEMO/ 기준, 공통 config)
+from adni.config import ADNI_DEMO, ADNI_TABLES
+DEFAULT_ADNIMERGE_CSV = os.path.join(ADNI_DEMO, 'ADNIMERGE_260213.csv')
+DEFAULT_MRIQC_CSV = os.path.join(ADNI_TABLES, 'MRIQC.csv')
+DEFAULT_APOERES_CSV = os.path.join(ADNI_TABLES, 'APOERES.csv')
+DEFAULT_BIRTH_DATES_CSV = os.path.join(ADNI_DEMO, 'birth_dates.csv')
 
 # UCBerkeley 테이블 디렉토리
-DEFAULT_UCB_TABLES_DIR = os.path.join(PROJECT_ROOT, 'csv', 'tables')
+DEFAULT_UCB_TABLES_DIR = ADNI_TABLES
 
 # MERGED.csv에서 제외할 모달리티 (파생 데이터)
 MERGE_EXCLUDE = ['ADC', 'FA', 'TRACEW']
@@ -181,6 +182,8 @@ def main():
                         help='Directory containing UCBerkeley CSV tables')
     parser.add_argument('--skip-ucberkeley', action='store_true',
                         help='Skip UCBerkeley PET quantification attach')
+    parser.add_argument('--enrich-protocol', action='store_true',
+                        help='Enrich existing *_unique.csv with MRIQC protocol data, then rebuild MERGED.csv')
     args = parser.parse_args()
 
     # 출력 디렉토리 생성
@@ -204,8 +207,29 @@ def main():
         logging.error('Run: python -m adni.extraction --build-adnimerge')
         sys.exit(1)
 
+    if not os.path.isfile(args.birth_dates):
+        logging.warning('birth_dates CSV not found: %s' % args.birth_dates)
+        logging.warning('subjectAge will be empty. Run: python -m adni.extraction --build-birth-dates')
+
     # Merge-only 모드
     if args.merge_only:
+        unique_csv_merge(args.output_dir, exclude_modalities=MERGE_EXCLUDE)
+        return
+
+    # Enrich-protocol 모드: 기존 *_unique.csv에 MRIQC + DCM inventory 보강 → MERGED.csv 재생성
+    if args.enrich_protocol:
+        unique_csvs = sorted(glob(os.path.join(args.output_dir, '*_unique.csv')))
+        if not unique_csvs:
+            logging.error('No *_unique.csv found in %s' % args.output_dir)
+            sys.exit(1)
+        inventory_path = os.path.join(args.output_dir, 'dcm_inventory.json')
+        for csv_path in unique_csvs:
+            mod = os.path.basename(csv_path).replace('_unique.csv', '')
+            logging.info('Enriching %s with MRIQC protocol data...' % mod)
+            enrich_protocol_from_mriqc(csv_path, args.mriqc, mod)
+            if os.path.isfile(inventory_path):
+                logging.info('Enriching %s with DCM inventory data...' % mod)
+                enrich_protocol_from_dcm_inventory(csv_path, inventory_path, mod)
         unique_csv_merge(args.output_dir, exclude_modalities=MERGE_EXCLUDE)
         return
 

@@ -55,11 +55,12 @@ MONTH_KEYS = np.array(list(MONTHS.keys()))
 # =============================================================================
 # DCM/NII 경로 설정
 # =============================================================================
-# NFS 기본 경로 (ADNI_New로 이전)
-NFS_BASE = '/Volumes/nfs_storage/1_combined/ADNI_New/ORIG/DCM'
+# NFS 기본 경로 (공통 config에서 가져옴)
+from adni.config import ADNI_DCM, ADNI_ORIG
+NFS_BASE = ADNI_DCM
 
 # 출력 기본 경로 (DCM 소스 경로와 분리)
-OUTPUT_BASE = '/Volumes/nfs_storage/1_combined/ADNI_New/ORIG'
+OUTPUT_BASE = ADNI_ORIG
 
 # DCM 소스별 경로 (source → 실제 디렉토리명)
 # 2026-02: ADNI_New 구조 — T1/T2/PET/DTI/fMRI/MRI(ADNI4 혼합)
@@ -302,20 +303,20 @@ UCBERKELEY_ATTACH_CONFIG = {
         'date_col': 'SCANDATE',
         'threshold': 30,
         'tracer_filter': ['MK6240'],
-        'column_prefix': 'UCBERKELEY_TAU_MK6240/',
+        'column_prefix': 'UCBERKELEY_TAU/',
     },
     'NAV4694_6MM': {
         'table': 'UCBERKELEY_AMY_6MM.csv',
         'date_col': 'SCANDATE',
         'threshold': 30,
         'tracer_filter': ['NAV'],
-        'column_prefix': 'UCBERKELEY_AMY_NAV/',
+        'column_prefix': 'UCBERKELEY_AMY/',
     },
     'PI2620_6MM': {
         'table': 'UCBERKELEY_TAU_6MM.csv',
         'date_col': 'SCANDATE',
         'threshold': 30,
         'tracer_filter': ['PI2620'],
-        'column_prefix': 'UCBERKELEY_TAU_PI2620/',
+        'column_prefix': 'UCBERKELEY_TAU/',
     },
 }
