@@ -64,12 +64,19 @@ def unique_csv_merge(output_directory: str, output_filename: str = 'MERGED.csv',
 
     # 나머지 CSV 순차 병합
     for i, row in df_list.iloc[1:].iterrows():
-        drop_columns = list(set(init_df.columns).intersection(set(row.df.columns)))
+        overlap_cols = list(set(init_df.columns).intersection(set(row.df.columns)))
         new_index = row.df.index.difference(init_df.index).unique()
-        init_df = init_df.join(row.df.drop(drop_columns, axis=1), how='outer')
+        init_df = init_df.join(row.df.drop(overlap_cols, axis=1), how='outer')
         init_df = init_df[~init_df.index.duplicated(keep='first')]
         if len(new_index) > 0:
             init_df.loc[new_index] = row.df.loc[new_index]
+        # 기존 행의 NaN 셀을 새 CSV 값으로 채움 (같은 prefix 공유 시 필요)
+        if overlap_cols:
+            existing_idx = row.df.index.intersection(init_df.index)
+            if len(existing_idx) > 0:
+                update_df = row.df.loc[existing_idx, overlap_cols]
+                init_df.loc[existing_idx, overlap_cols] = \
+                    init_df.loc[existing_idx, overlap_cols].combine_first(update_df)
         logging.info('merge csv: %s, current shape: %s' % (row.path, str(init_df.shape)))
 
     init_df.sort_index().to_csv(output_path)

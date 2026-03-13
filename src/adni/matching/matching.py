@@ -5,20 +5,18 @@ ADNI.py 대응:
   - _nearest_adinmerge()  → nearest_adnimerge()
   - _calc_viscode()       → calc_viscode()
   - _demo_matching()      → match_image()       (XML → 경로+MRIQC+DCM+demographics)
-  - subj_matching()       → match_subject()
+  - subj_matching()       → match_subject_from_inventory()
   - adnimerge_matching()  → match_modality()
 """
 
 import os
 import csv
-import fnmatch
 import warnings
 import logging
 import datetime
 
 import numpy as np
 import pandas as pd
-from glob import glob
 from joblib import Parallel, delayed
 
 from .config import (
@@ -274,170 +272,6 @@ def _fill_protocol(row: pd.DataFrame, modality: str, image_uid: str,
 
 
 # =============================================================================
-# Image Collection (NII + DCM)
-# =============================================================================
-
-def collect_images(subj_dir: str, regex: list, file_type: str = 'nii',
-                   exclude_regex: list = None) -> list:
-    """
-    모달리티에 맞는 이미지(NII 파일) 또는 시리즈 폴더(DCM) 수집
-
-    DCM 구조: {subj}/{protocol}/{date}/I{UID}/*.dcm
-    NII 구조: {subj}/{protocol}/{date}/I{UID}/*.nii*
-
-    Args:
-        subj_dir: 피험자 디렉토리
-        regex: 프로토콜 매칭 glob 패턴 리스트
-        file_type: 'nii' (NII 파일 반환) 또는 'dcm' (DCM 시리즈 폴더 반환)
-        exclude_regex: 제외할 프로토콜 glob 패턴 리스트
-
-    Returns:
-        NII: 파일 경로 리스트
-        DCM: 시리즈 폴더 경로 리스트 (I{UID} 디렉토리)
-    """
-    if isinstance(regex, str):
-        regex = [regex]
-
-    image_list = []
-
-    if file_type == 'nii':
-        # 기존 로직: {subj}/{protocol}/{date}/I{UID}/*.nii*
-        for re_pattern in regex:
-            image_list += glob(os.path.join(subj_dir, re_pattern, '*', '*', '*.nii*'))
-    else:  # dcm
-        # DCM: {subj}/{protocol}/{date}/I{UID}/ → 폴더 자체가 "이미지"
-        for re_pattern in regex:
-            # protocol 매칭 → 그 아래 date/I{UID} 폴더들
-            protocol_dirs = glob(os.path.join(subj_dir, re_pattern))
-            for proto_dir in protocol_dirs:
-                if not os.path.isdir(proto_dir):
-                    continue
-                # date 폴더들
-                for date_dir in glob(os.path.join(proto_dir, '*')):
-                    if not os.path.isdir(date_dir):
-                        continue
-                    # I{UID} 폴더들
-                    for uid_dir in glob(os.path.join(date_dir, 'I*')):
-                        if os.path.isdir(uid_dir):
-                            # DCM 파일 존재 확인
-                            dcm_files = glob(os.path.join(uid_dir, '*.dcm'))
-                            if dcm_files:
-                                image_list.append(uid_dir)
-
-    # exclude_regex 적용 (프로토콜 레벨에서 필터링)
-    if exclude_regex:
-        if isinstance(exclude_regex, str):
-            exclude_regex = [exclude_regex]
-        filtered = []
-        for img in image_list:
-            # 프로토콜은 경로에서 PTID 바로 다음 디렉토리
-            # {base}/{PTID}/{protocol}/{date}/I{UID}[/file.nii]
-            # DCM: img = .../{protocol}/{date}/I{UID}
-            # NII: img = .../{protocol}/{date}/I{UID}/file.nii
-            if file_type == 'nii':
-                # img 경로: .../protocol/date/IUID/file.nii → protocol은 4단계 위
-                protocol_name = img.split(os.sep)[-4]
-            else:
-                # img 경로: .../protocol/date/IUID → protocol은 3단계 위
-                protocol_name = img.split(os.sep)[-3]
-
-            excluded = False
-            for ex_pat in exclude_regex:
-                if fnmatch.fnmatch(protocol_name, ex_pat):
-                    excluded = True
-                    break
-            if not excluded:
-                filtered.append(img)
-        image_list = filtered
-
-    return sorted(set(image_list))
-
-
-# =============================================================================
-# Subject-Level Matching (replaces subj_matching)
-# =============================================================================
-
-def match_subject(output_directory: str, subj_dir: str,
-                  adnimerge_df: pd.DataFrame,
-                  threshold: int, modality: str,
-                  regex: list,
-                  file_type: str = 'nii',
-                  exclude_regex: list = None,
-                  create_symlinks: bool = False,
-                  mriqc_df: pd.DataFrame = None,
-                  apoeres_df: pd.DataFrame = None,
-                  birth_dates_df: pd.DataFrame = None,
-                  dcm_inventory: dict = None,
-                  log_path: str = '') -> pd.DataFrame:
-    """
-    단일 피험자의 모든 이미지 매칭
-
-    ADNI.py subj_matching()과 동일 로직:
-    - regex로 이미지 파일(NII) 또는 시리즈 폴더(DCM) 수집
-    - 각 이미지에 match_image() 적용
-    - VISCODE_FIX + EXAMDATE + ImageUID 정렬 (closest & largest)
-    - 심볼릭 링크 생성 (NII: 파일, DCM: 디렉토리)
-    """
-    warnings.filterwarnings(action='ignore')
-    if log_path:
-        reset_logger(log_path)
-
-    ptid = os.path.split(subj_dir)[1]
-    subj_adnimerge = adnimerge_df.query("PTID=='%s'" % ptid)
-
-    # collect_images()로 NII/DCM 통합 수집
-    image_list = collect_images(subj_dir, regex, file_type=file_type,
-                                exclude_regex=exclude_regex)
-
-    # 각 이미지 매칭
-    subj_result = []
-    for image in image_list:
-        result = match_image(
-            subj_adnimerge, image, threshold, modality,
-            mriqc_df=mriqc_df,
-            apoeres_df=apoeres_df,
-            birth_dates_df=birth_dates_df,
-            dcm_inventory=dcm_inventory,
-            log_path=log_path,
-        )
-        if result is not None:
-            subj_result.append(result)
-
-    if not subj_result:
-        return None
-
-    subj_result = pd.concat(subj_result, ignore_index=True)
-
-    # EXAMDATE_datetime 기반 정렬 (closest & largest ImageUID)
-    if ADNIMERGE_MATCHING_TARGET_COLUMN in subj_result.columns:
-        subj_result[ADNIMERGE_MATCHING_TARGET_COLUMN] = subj_result[ADNIMERGE_MATCHING_TARGET_COLUMN].fillna(
-            pd.Timedelta(99999, unit='d'))
-        subj_result[ADNIMERGE_MATCHING_TARGET_COLUMN] *= -1
-        subj_result = subj_result.sort_values(
-            by=['VISCODE_FIX', ADNIMERGE_MATCHING_TARGET_COLUMN, 'I_%s' % modality])
-    else:
-        subj_result = subj_result.sort_values(
-            by=['VISCODE_FIX', 'I_%s' % modality])
-
-    # 심볼릭 링크 생성 (옵션, 기본 꺼짐 — MERGED.csv만 필요하면 불필요)
-    if create_symlinks:
-        for _, row in subj_result.iterrows():
-            directory = os.path.join(output_directory, 'image', ptid, str(row['VISCODE_FIX']), modality)
-            os.makedirs(directory, exist_ok=True)
-            img_path = row['%s_image_path' % modality]
-            link_path = os.path.join(directory, os.path.basename(img_path))
-            if not os.path.exists(link_path):
-                try:
-                    os.symlink(img_path, link_path)
-                except OSError:
-                    pass
-
-    logging.debug('\t%s: %s visit points and %s images detected' % (
-        ptid, len(subj_result['VISCODE_FIX'].unique()), len(subj_result)))
-    return subj_result
-
-
-# =============================================================================
 # Subject-Level Matching from Inventory (v2)
 # =============================================================================
 
@@ -454,7 +288,7 @@ def match_subject_from_inventory(output_directory: str, ptid: str,
     """
     인벤토리 기반 단일 피험자 매칭 (파일시스템 I/O 없음)
 
-    match_subject()와 동일 로직이나 collect_images() 대신
+    ADNI.py subj_matching()과 동일 로직이나 파일시스템 스캔 대신
     인벤토리의 image_records를 직접 사용.
 
     최적화:
@@ -585,7 +419,7 @@ def match_modality(adnimerge_csv: str,
         logging.info('MRIQC loaded: %d rows' % len(mriqc_df))
         for _, row in mriqc_df.iterrows():
             loni_val = row['LONIImage']
-            key = str(int(loni_val)) if pd.notna(loni_val) else ''
+            key = _normalize_uid(loni_val) if pd.notna(loni_val) else ''
             if key:
                 mriqc_index[key] = row
 
@@ -646,6 +480,203 @@ def match_modality(adnimerge_csv: str,
     logging.info('Output saved at %s' % output_path_all)
     logging.info('Output saved at %s' % output_path_unique)
     logging.info('-----------------------------------------------------\n')
+
+
+# =============================================================================
+# Protocol Enrichment from MRIQC (post-processing)
+# =============================================================================
+
+def _normalize_uid(val) -> str:
+    """UID 값을 정규화된 문자열로 변환 (numpy float/int 대응)."""
+    try:
+        return str(int(float(val)))
+    except (ValueError, TypeError):
+        return str(val)
+
+
+# MRIQC 컬럼 → protocol 출력 이름 (config의 MRIQC_PROTOCOL_FIELDS 서브셋)
+_MRIQC_ENRICH_MAP = {
+    'SeriesDescription': 'description',
+    'AcquisitionType': 'Acquisition Type',
+    'AcquisitionPlane': 'Acquisition Plane',
+    'SeriesType': 'Weighting',
+    'SliceThickness': 'Slice Thickness',
+    'ReceiveCoilName': 'Coil',
+    'ScannerManufacturer': 'Manufacturer',
+    'ScannerModel': 'Mfg Model',
+    'MagneticFieldStrength': 'Field Strength',
+}
+
+
+def enrich_protocol_from_mriqc(unique_csv: str, mriqc_csv: str, modality: str):
+    """기존 *_unique.csv에 MRIQC 프로토콜 데이터 보강 (in-place 저장)
+
+    매칭 시 MRIQC 없이 생성된 unique.csv에 대해 사후 보강.
+    기존 값이 있는 셀은 건드리지 않고, 비어있는 셀만 채움.
+
+    Args:
+        unique_csv: *_unique.csv 경로
+        mriqc_csv: MRIQC.csv 경로
+        modality: 모달리티명 (e.g., 'T1')
+    """
+    if not os.path.isfile(unique_csv):
+        logging.warning('unique_csv not found: %s' % unique_csv)
+        return
+    if not os.path.isfile(mriqc_csv):
+        logging.warning('MRIQC CSV not found: %s' % mriqc_csv)
+        return
+
+    df = pd.read_csv(unique_csv, low_memory=False)
+    mriqc_df = pd.read_csv(mriqc_csv, low_memory=False)
+
+    uid_col = 'I_%s' % modality
+    if uid_col not in df.columns:
+        logging.warning('Column %s not found in %s' % (uid_col, unique_csv))
+        return
+
+    # MRIQC dict: {image_uid_str: Series}
+    mriqc_index = {}
+    for _, row in mriqc_df.iterrows():
+        loni_val = row.get('LONIImage')
+        if pd.notna(loni_val):
+            key = _normalize_uid(loni_val)
+            mriqc_index[key] = row
+
+    protocol_prefix = 'protocol/%s/' % modality
+    filled_count = 0
+    matched_count = 0
+
+    for idx, row in df.iterrows():
+        uid = row.get(uid_col)
+        if pd.isna(uid):
+            continue
+        uid_str = _normalize_uid(uid)
+
+        mriqc_row = mriqc_index.get(uid_str)
+        if mriqc_row is None:
+            continue
+
+        matched_count += 1
+
+        for mriqc_col, output_name in _MRIQC_ENRICH_MAP.items():
+            col = protocol_prefix + output_name
+            # 컬럼이 없으면 생성
+            if col not in df.columns:
+                df[col] = ''
+            # 기존 값이 비어있을 때만 채움
+            existing = df.at[idx, col]
+            if pd.isna(existing) or str(existing).strip() == '':
+                val = mriqc_row.get(mriqc_col, '')
+                if pd.notna(val) and str(val).strip():
+                    df.at[idx, col] = str(val)
+                    filled_count += 1
+
+    df.to_csv(unique_csv, index=False, quoting=csv.QUOTE_NONNUMERIC)
+    logging.info('Enriched %s: %d cells filled from MRIQC (%d rows, %d matched UIDs)' % (
+        os.path.basename(unique_csv), filled_count, len(df), matched_count))
+
+
+# DCM 인벤토리 → protocol 필드 매핑
+_DCM_ENRICH_MAP = [
+    ('dcm_PixelSpacing', None),        # 특수 처리 → Pixel Spacing X/Y
+    ('dcm_PulseSequence', 'Pulse Sequence'),
+    ('dcm_MatrixX', 'Matrix X'),
+    ('dcm_MatrixY', 'Matrix Y'),
+    ('dcm_MatrixZ', 'Matrix Z'),       # NumberOfFrames 우선, dcm_count fallback
+]
+
+
+def enrich_protocol_from_dcm_inventory(unique_csv: str, inventory_path: str, modality: str):
+    """기존 *_unique.csv에 DCM 인벤토리의 프로토콜 데이터 보강 (in-place 저장)
+
+    Pixel Spacing X/Y, Matrix X/Y/Z, Pulse Sequence 등 MRIQC에 없는 필드를
+    DCM 인벤토리에서 채움. 기존 값이 있는 셀은 건드리지 않음.
+
+    Args:
+        unique_csv: *_unique.csv 경로
+        inventory_path: dcm_inventory.json 경로
+        modality: 모달리티명 (e.g., 'T1')
+    """
+    import json
+
+    if not os.path.isfile(unique_csv):
+        logging.warning('unique_csv not found: %s' % unique_csv)
+        return
+    if not os.path.isfile(inventory_path):
+        logging.warning('inventory not found: %s' % inventory_path)
+        return
+
+    with open(inventory_path) as f:
+        inventory = json.load(f)
+
+    by_image_uid = inventory.get('by_image_uid', {})
+    if not by_image_uid:
+        logging.warning('by_image_uid not found in inventory')
+        return
+
+    df = pd.read_csv(unique_csv, low_memory=False)
+    uid_col = 'I_%s' % modality
+    if uid_col not in df.columns:
+        logging.warning('Column %s not found in %s' % (uid_col, unique_csv))
+        return
+
+    protocol_prefix = 'protocol/%s/' % modality
+    filled_count = 0
+    matched_count = 0
+
+    for idx, row in df.iterrows():
+        uid = row.get(uid_col)
+        if pd.isna(uid):
+            continue
+        uid_str = _normalize_uid(uid)
+
+        dcm_record = by_image_uid.get(uid_str, {})
+        if not dcm_record:
+            continue
+
+        matched_count += 1
+
+        # Pixel Spacing: [x, y] 또는 "x\\y" 형식
+        ps = dcm_record.get('dcm_PixelSpacing', '')
+        if ps:
+            ps_str = str(ps).replace('[', '').replace(']', '')
+            # Try comma-separated first (JSON list), then backslash
+            if ',' in ps_str:
+                parts = [p.strip() for p in ps_str.split(',')]
+            else:
+                parts = [p.strip() for p in ps_str.split('\\')]
+            for suffix, val in [('Pixel Spacing X', parts[0] if parts else ''),
+                                ('Pixel Spacing Y', parts[-1] if parts else '')]:
+                col = protocol_prefix + suffix
+                if col not in df.columns:
+                    df[col] = ''
+                existing = df.at[idx, col]
+                if (pd.isna(existing) or str(existing).strip() == '') and val:
+                    df.at[idx, col] = val
+                    filled_count += 1
+
+        # Other fields
+        for inv_key, output_name in _DCM_ENRICH_MAP:
+            if output_name is None:  # Pixel Spacing handled above
+                continue
+            col = protocol_prefix + output_name
+            if col not in df.columns:
+                df[col] = ''
+            existing = df.at[idx, col]
+            if pd.isna(existing) or str(existing).strip() == '':
+                val = dcm_record.get(inv_key, '')
+                # Matrix Z: dcm_count fallback
+                if inv_key == 'dcm_MatrixZ' and not val:
+                    val = dcm_record.get('dcm_count', '')
+                if val:
+                    val_str = str(val).strip()
+                    if val_str:
+                        df.at[idx, col] = val_str
+                        filled_count += 1
+
+    df.to_csv(unique_csv, index=False, quoting=csv.QUOTE_NONNUMERIC)
+    logging.info('Enriched %s: %d cells filled from DCM inventory (%d rows, %d matched UIDs)' % (
+        os.path.basename(unique_csv), filled_count, len(df), matched_count))
 
 
 # =============================================================================
